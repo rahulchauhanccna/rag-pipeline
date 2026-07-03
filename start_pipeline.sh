@@ -67,12 +67,24 @@ echo "-------------------------------------------"
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+    echo "Virtual environment not found."
+    echo "Options:"
+    echo "  1) Create virtual environment (recommended, takes ~30s)"
+    echo "  2) Use system Python (faster, may affect other projects)"
+    read -p "Choose (1/2, default: 2): " venv_choice
+    venv_choice=${venv_choice:-2}
+    
+    if [ "$venv_choice" = "1" ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv venv
+        source venv/bin/activate
+    else
+        echo "Using system Python..."
+    fi
+else
+    echo "Activating existing virtual environment..."
+    source venv/bin/activate
 fi
-
-# Activate virtual environment
-source venv/bin/activate
 
 # Check if dependencies are already installed
 echo "Checking Python dependencies..."
