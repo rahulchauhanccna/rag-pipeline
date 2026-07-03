@@ -65,34 +65,35 @@ echo ""
 echo "Step 2: Setting up Python environment..."
 echo "-------------------------------------------"
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "Virtual environment not found."
-    echo "Options:"
-    echo "  1) Create virtual environment (recommended, takes ~30s)"
-    echo "  2) Use system Python (faster, may affect other projects)"
-    read -p "Choose (1/2, default: 2): " venv_choice
-    venv_choice=${venv_choice:-2}
-    
-    if [ "$venv_choice" = "1" ]; then
-        echo "Creating virtual environment..."
-        python3 -m venv venv
-        source venv/bin/activate
+# First check if system Python already has dependencies
+echo "Checking system Python dependencies..."
+if /usr/bin/python3 -c "import chromadb, sentence_transformers, langchain, pyiceberg" 2>/dev/null; then
+    echo "✓ Core dependencies already installed in system Python"
+    PYTHON_CMD="/usr/bin/python3"
+    PIP_CMD="pip3"
+else
+    echo "System Python missing dependencies."
+    # Check if venv exists and has packages
+    if [ -d "venv" ]; then
+        echo "Checking virtual environment..."
+        if venv/bin/python3 -c "import chromadb, sentence_transformers, langchain, pyiceberg" 2>/dev/null; then
+            echo "✓ Core dependencies found in venv"
+            source venv/bin/activate
+            PYTHON_CMD="python3"
+            PIP_CMD="pip"
+        else
+            echo "venv exists but missing packages. Installing..."
+            source venv/bin/activate
+            pip install -q -r requirements.txt
+            PYTHON_CMD="python3"
+            PIP_CMD="pip"
+        fi
     else
-        echo "Using system Python..."
+        echo "Installing dependencies in system Python (fastest option)..."
+        pip3 install -q -r requirements.txt
+        PYTHON_CMD="/usr/bin/python3"
+        PIP_CMD="pip3"
     fi
-else
-    echo "Activating existing virtual environment..."
-    source venv/bin/activate
-fi
-
-# Check if dependencies are already installed
-echo "Checking Python dependencies..."
-if python3 -c "import chromadb, sentence_transformers, langchain, pyiceberg" 2>/dev/null; then
-    echo "✓ Core dependencies already installed"
-else
-    echo "Installing Python dependencies..."
-    pip install -q -r requirements.txt
 fi
 
 echo ""
@@ -108,7 +109,7 @@ read -p "Press Enter once you've created the bucket..."
 echo ""
 echo "Step 4: Setting up Vector Database..."
 echo "-------------------------------------------"
-python vector-db/setup_vector_db.py --reset
+$PYTHON_CMD vector_db/setup_vector_db.py --reset
 
 echo ""
 echo "=========================================="
@@ -117,16 +118,16 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "1. Start the order stream generator:"
-echo "   python data-generators/order_stream_generator.py --mode socket"
+echo "   python data_generators/order_stream_generator.py --mode socket"
 echo ""
 echo "2. In another terminal, start the Flink job:"
 echo "   python flink-job/flink_job.py"
 echo ""
 echo "3. In another terminal, run the RAG application:"
-echo "   python rag-app/rag_app.py --interactive"
+echo "   python rag_app/rag_app.py --interactive"
 echo ""
 echo "Or run everything in demo mode:"
-echo "   python rag-app/rag_app.py --interactive  # Uses mock data"
+echo "   python rag_app/rag_app.py --interactive  # Uses mock data"
 echo ""
 echo "Service URLs:"
 echo "  - MinIO Console: http://localhost:9001"
