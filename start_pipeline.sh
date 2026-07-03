@@ -74,9 +74,14 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
-# Install dependencies
-echo "Installing Python dependencies..."
-pip install -q -r requirements.txt
+# Check if dependencies are already installed
+echo "Checking Python dependencies..."
+if python3 -c "import chromadb, sentence_transformers, langchain, pyiceberg" 2>/dev/null; then
+    echo "✓ Core dependencies already installed"
+else
+    echo "Installing Python dependencies..."
+    pip install -q -r requirements.txt
+fi
 
 echo ""
 echo "Step 3: Creating MinIO bucket..."
