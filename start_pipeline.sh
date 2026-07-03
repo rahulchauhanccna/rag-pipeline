@@ -99,12 +99,9 @@ fi
 echo ""
 echo "Step 3: Creating MinIO bucket..."
 echo "-------------------------------------------"
-echo "Please create the 'warehouse' bucket manually:"
-echo "1. Open http://localhost:9001"
-echo "2. Login with: admin / password123"
-echo "3. Click 'Create Bucket' and name it: warehouse"
-echo ""
-read -p "Press Enter once you've created the bucket..."
+echo "Creating 'warehouse' bucket in MinIO..."
+docker exec minio mc alias set local http://localhost:9000 admin password123 > /dev/null 2>&1
+docker exec minio mc mb local/warehouse > /dev/null 2>&1 && echo "✓ Bucket 'warehouse' created" || echo "✓ Bucket 'warehouse' already exists"
 
 echo ""
 echo "Step 4: Setting up Vector Database..."

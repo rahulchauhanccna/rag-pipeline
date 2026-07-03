@@ -346,7 +346,7 @@ def setup_vector_db(reset: bool = False):
     policy_file = os.path.join(
         os.path.dirname(__file__),
         "..",
-        "data-generators",
+        "data_generators",
         "policy_documents.md"
     )
     
