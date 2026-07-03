@@ -134,7 +134,8 @@ class OrderStreamGenerator:
         return order.copy()
     
     def stream_to_socket(self, host: str = "localhost", port: int = 9999, 
-                        delay: float = 1.0, num_events: int = None):
+                        delay: float = 1.0, num_events: int = None,
+                        self_connect: bool = False):
         """
         Stream order events to a TCP socket.
         
@@ -143,6 +144,7 @@ class OrderStreamGenerator:
             port: Socket port
             delay: Delay between events in seconds
             num_events: Number of events to generate (None for infinite)
+            self_connect: If True, connect a client automatically for testing
         """
         print(f"Starting order stream generator on {host}:{port}")
         print(f"Customer 123 has a delayed order: {self.customer_123_delayed}")
@@ -152,14 +154,32 @@ class OrderStreamGenerator:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind((host, port))
         server_socket.listen(5)
+        server_socket.settimeout(5.0)  # Timeout so we can check for Ctrl+C
         
-        print(f"Waiting for Flink to connect on {host}:{port}...")
-        client_socket, addr = server_socket.accept()
-        print(f"Connected to {addr}")
-        
+        client_socket = None
         count = 0
         try:
             while num_events is None or count < num_events:
+                # Try to accept a connection if not connected
+                if client_socket is None:
+                    if self_connect:
+                        # Self-connect for testing: also print to console
+                        print(f"Self-connect mode: generating events to console (port {port} open for Flink)")
+                        event = self.generate_order_event()
+                        print(f"[{count+1}] {event['order_id']} - Customer {event['customer_id']} - {event['status']}")
+                        print(f"    Delivery: {event['delivery_notes']}")
+                        count += 1
+                        time.sleep(delay)
+                        continue
+                    else:
+                        print(f"Waiting for Flink to connect on {host}:{port}...")
+                        print("(Use --self-connect to test without Flink)")
+                        try:
+                            client_socket, addr = server_socket.accept()
+                            print(f"✓ Connected to {addr}")
+                        except socket.timeout:
+                            continue
+                
                 event = self.generate_order_event()
                 event_json = json.dumps(event) + "\n"
                 
@@ -169,8 +189,8 @@ class OrderStreamGenerator:
                     count += 1
                 except (BrokenPipeError, ConnectionResetError):
                     print("Client disconnected. Waiting for new connection...")
-                    client_socket, addr = server_socket.accept()
-                    print(f"Reconnected to {addr}")
+                    client_socket.close()
+                    client_socket = None
                     continue
                 
                 time.sleep(delay)
@@ -178,7 +198,8 @@ class OrderStreamGenerator:
         except KeyboardInterrupt:
             print("\nStopping stream generator...")
         finally:
-            client_socket.close()
+            if client_socket:
+                client_socket.close()
             server_socket.close()
             print(f"Generated {count} order events")
     
@@ -220,6 +241,8 @@ def main():
                        help="Number of events to generate (None for infinite in socket mode)")
     parser.add_argument("--no-delayed-order", action="store_true",
                        help="Disable the delayed order for customer 123")
+    parser.add_argument("--self-connect", action="store_true",
+                       help="In socket mode, generate events to console too (for testing without Flink)")
     
     args = parser.parse_args()
     
@@ -230,7 +253,8 @@ def main():
             host=args.host, 
             port=args.port, 
             delay=args.delay, 
-            num_events=args.num_events
+            num_events=args.num_events,
+            self_connect=args.self_connect
         )
     else:
         generator.stream_to_console(delay=args.delay, num_events=args.num_events or 20)
